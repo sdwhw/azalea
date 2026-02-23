@@ -45,7 +45,7 @@ impl World {
                 block_states,
                 chunk_pos,
                 &chunk.read(),
-                self.chunks.min_y,
+                self.chunks.min_y(),
                 |this_block_pos| {
                     let this_block_distance = (nearest_to - this_block_pos).length_manhattan();
                     // only update if it's closer
@@ -157,7 +157,7 @@ impl Iterator for FindBlocks<'_> {
                 self.block_states,
                 chunk_pos,
                 &chunk.read(),
-                self.chunks.min_y,
+                self.chunks.min_y(),
                 |this_block_pos| {
                     let this_block_distance = (self.nearest_to - this_block_pos).length_manhattan();
 

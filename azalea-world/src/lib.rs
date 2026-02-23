@@ -11,7 +11,9 @@ pub mod palette;
 mod world;
 
 pub use bit_storage::BitStorage;
-pub use chunk_storage::{Chunk, ChunkStorage, PartialChunkStorage, Section};
+pub use chunk_storage::{
+    Chunk, ChunkStorage, ChunkStorageTrait, PartialChunkStorage, Section, WeakChunkStorage,
+};
 pub use container::{WorldName, Worlds};
 pub use world::*;
 

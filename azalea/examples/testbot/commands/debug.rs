@@ -16,7 +16,7 @@ use azalea::{
 use azalea_core::hit_result::HitResult;
 use azalea_entity::{EntityKindComponent, metadata};
 use azalea_inventory::{Menu, components::MaxStackSize};
-use azalea_world::Worlds;
+use azalea_world::{WeakChunkStorage, Worlds};
 use bevy_app::AppExit;
 use bevy_ecs::{message::Messages, query::With, world::EntityRef};
 use parking_lot::Mutex;
@@ -341,19 +341,24 @@ pub fn register(commands: &mut CommandDispatcher<Mutex<CommandSource>>) {
                                 .unwrap();
                             if let Some(world) = world.upgrade() {
                                 let world = world.read();
-                                let strong_chunks = world
-                                    .chunks
-                                    .map
-                                    .iter()
-                                    .filter(|(_, v)| v.strong_count() > 0)
-                                    .count();
-                                writeln!(
-                                    report,
-                                    "- Chunks: {} strongly referenced, {} in map",
-                                    strong_chunks,
-                                    world.chunks.map.len()
-                                )
-                                .unwrap();
+                                if let Some(weak) = (world.chunks.0.as_ref() as &dyn std::any::Any).downcast_ref::<WeakChunkStorage>() {
+                                    let strong_chunks = weak.map
+                                        .iter()
+                                        .filter(|(_, v)| v.strong_count() > 0)
+                                        .count();
+                                    writeln!(
+                                        report,
+                                        "- Chunks: {} strongly referenced, {} in map",
+                                        strong_chunks,
+                                        world.chunks.chunks().len()
+                                    ).unwrap();
+                                } else {
+                                    writeln!(
+                                        report,
+                                        "- Chunks: {} in map",
+                                        world.chunks.chunks().len()
+                                    ).unwrap();
+                                }
                                 writeln!(
                                     report,
                                     "- Entities: {}",

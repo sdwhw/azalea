@@ -6,7 +6,8 @@ use std::{
     io::{Cursor, Write},
     sync::{Arc, Weak},
 };
-
+use std::any::Any;
+use std::ops::Deref;
 use azalea_block::{
     block_state::{BlockState, BlockStateIntegerRepr},
     fluid_state::FluidState,
@@ -27,6 +28,21 @@ use tracing::{debug, trace, warn};
 use crate::{heightmap::Heightmap, palette::PalettedContainer};
 
 const SECTION_HEIGHT: u32 = 16;
+
+pub trait ChunkStorageTrait: Send + Sync + Any {
+    fn min_y(&self) -> i32;
+    fn height(&self) -> u32;
+    fn get_chunk(&self, pos: &ChunkPos) -> Option<Arc<RwLock<Chunk>>>;
+    fn upsert_chunk(&mut self, pos: ChunkPos, chunk: Chunk) -> Arc<RwLock<Chunk>>;
+    fn chunks(&self) -> Box<[&ChunkPos]>;
+    fn clone_box(&self) -> Box<dyn ChunkStorageTrait>;
+
+    fn get_block_state(&self, pos: BlockPos) -> Option<BlockState> {
+        let chunk = self.get_chunk(&ChunkPos::from(pos))?;
+        let chunk = chunk.read();
+        chunk.get_block_state(&ChunkBlockPos::from(pos), self.min_y())
+    }
+}
 
 /// An efficient storage of chunks for a client that has a limited render
 /// distance.
@@ -49,7 +65,7 @@ pub struct PartialChunkStorage {
 /// This is relatively cheap to clone since it's just an `IntMap` with `Weak`
 /// pointers.
 #[derive(Clone, Debug)]
-pub struct ChunkStorage {
+pub struct WeakChunkStorage {
     /// The height of the world.
     ///
     /// To get the maximum y position (exclusive), you have to combine this with
@@ -63,6 +79,10 @@ pub struct ChunkStorage {
     pub min_y: i32,
     pub map: IntMap<ChunkPos, Weak<RwLock<Chunk>>>,
 }
+
+/// An abstract chunk storage backed by a [`ChunkStorageTrait`] implementation.
+/// By default, this wraps a [`WeakChunkStorage`].
+pub struct ChunkStorage(pub Box<dyn ChunkStorageTrait>);
 
 /// A single chunk in a world (16*?*16 blocks).
 ///
@@ -104,6 +124,85 @@ impl Default for Chunk {
             sections: vec![Section::default(); (384 / 16) as usize].into(),
             heightmaps: HashMap::new(),
         }
+    }
+}
+
+impl ChunkStorage {
+    /// Create a storage backed by a [`WeakChunkStorage`] with the given world
+    /// dimensions.
+    pub fn new(height: u32, min_y: i32) -> Self {
+        Self(Box::new(WeakChunkStorage::new(height, min_y)))
+    }
+
+    /// Create a storage backed by a custom [`ChunkStorageTrait`] implementation.
+    pub fn new_with(inner: Box<dyn ChunkStorageTrait>) -> Self {
+        Self(inner)
+    }
+
+    pub fn min_y(&self) -> i32 {
+        self.0.min_y()
+    }
+
+    pub fn height(&self) -> u32 {
+        self.0.height()
+    }
+
+    pub fn get(&self, pos: &ChunkPos) -> Option<Arc<RwLock<Chunk>>> {
+        self.0.get_chunk(pos)
+    }
+
+    pub fn upsert_chunk(&mut self, pos: ChunkPos, chunk: Chunk) -> Arc<RwLock<Chunk>> {
+        self.0.upsert_chunk(pos, chunk)
+    }
+
+    pub fn get_fluid_state(&self, pos: BlockPos) -> Option<FluidState> {
+        let block_state = self.get_block_state(pos)?;
+        Some(FluidState::from(block_state))
+    }
+
+    pub fn get_biome(&self, pos: BlockPos) -> Option<Biome> {
+        let chunk = self.get(&ChunkPos::from(pos))?;
+        let chunk = chunk.read();
+        chunk.get_biome(ChunkBiomePos::from(pos), self.min_y())
+    }
+
+    pub fn set_block_state(&self, pos: BlockPos, state: BlockState) -> Option<BlockState> {
+        if pos.y < self.min_y() || pos.y >= (self.min_y() + self.height() as i32) {
+            return None;
+        }
+        let chunk = self.get(&ChunkPos::from(pos))?;
+        let mut chunk = chunk.write();
+        Some(chunk.get_and_set_block_state(&ChunkBlockPos::from(pos), state, self.min_y()))
+    }
+}
+
+impl Deref for ChunkStorage {
+    type Target = dyn ChunkStorageTrait;
+
+    fn deref(&self) -> &Self::Target {
+        self.0.deref()
+    }
+}
+
+impl Clone for ChunkStorage {
+    fn clone(&self) -> Self {
+        Self(self.0.clone_box())
+    }
+}
+
+impl Debug for ChunkStorage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ChunkStorage")
+            .field("min_y", &self.0.min_y())
+            .field("height", &self.0.height())
+            .field("chunk_count", &self.0.chunks().len())
+            .finish()
+    }
+}
+
+impl Default for ChunkStorage {
+    fn default() -> Self {
+        Self::new(384, -64)
     }
 }
 
@@ -181,15 +280,19 @@ impl PartialChunkStorage {
         state: BlockState,
         chunk_storage: &ChunkStorage,
     ) -> Option<BlockState> {
-        if pos.y < chunk_storage.min_y
-            || pos.y >= (chunk_storage.min_y + chunk_storage.height as i32)
+        if pos.y < chunk_storage.min_y()
+            || pos.y >= (chunk_storage.min_y() + chunk_storage.height() as i32)
         {
             return None;
         }
         let chunk_pos = ChunkPos::from(pos);
         let chunk_lock = chunk_storage.get(&chunk_pos)?;
         let mut chunk = chunk_lock.write();
-        Some(chunk.get_and_set_block_state(&ChunkBlockPos::from(pos), state, chunk_storage.min_y))
+        Some(chunk.get_and_set_block_state(
+            &ChunkBlockPos::from(pos),
+            state,
+            chunk_storage.min_y(),
+        ))
     }
 
     pub fn replace_with_packet_data(
@@ -207,8 +310,8 @@ impl PartialChunkStorage {
 
         let chunk = Chunk::read_with_dimension_height(
             data,
-            chunk_storage.height,
-            chunk_storage.min_y,
+            chunk_storage.height(),
+            chunk_storage.min_y(),
             heightmaps,
         )?;
 
@@ -254,34 +357,7 @@ impl PartialChunkStorage {
     /// # Panics
     /// If the chunk is not in the render distance.
     pub fn set(&mut self, pos: &ChunkPos, chunk: Option<Chunk>, chunk_storage: &mut ChunkStorage) {
-        let new_chunk;
-
-        // add the chunk to the shared storage
-        if let Some(chunk) = chunk {
-            match chunk_storage.map.entry(*pos) {
-                Entry::Occupied(mut e) => {
-                    if let Some(old_chunk) = e.get_mut().upgrade() {
-                        *old_chunk.write() = chunk;
-                        new_chunk = Some(old_chunk);
-                    } else {
-                        let chunk_lock = Arc::new(RwLock::new(chunk));
-                        e.insert(Arc::downgrade(&chunk_lock));
-                        new_chunk = Some(chunk_lock);
-                    }
-                }
-                Entry::Vacant(e) => {
-                    let chunk_lock = Arc::new(RwLock::new(chunk));
-                    e.insert(Arc::downgrade(&chunk_lock));
-                    new_chunk = Some(chunk_lock);
-                }
-            }
-        } else {
-            // don't remove it from the shared storage, since it'll be removed
-            // automatically if this was the last reference
-
-            new_chunk = None;
-        }
-
+        let new_chunk = chunk.map(|c| chunk_storage.upsert_chunk(*pos, c));
         self.limited_set(pos, new_chunk);
     }
 
@@ -304,9 +380,9 @@ impl PartialChunkStorage {
         self.chunks.iter()
     }
 }
-impl ChunkStorage {
+impl WeakChunkStorage {
     pub fn new(height: u32, min_y: i32) -> Self {
-        ChunkStorage {
+        WeakChunkStorage {
             height,
             min_y,
             map: IntMap::default(),
@@ -316,34 +392,55 @@ impl ChunkStorage {
     pub fn get(&self, pos: &ChunkPos) -> Option<Arc<RwLock<Chunk>>> {
         self.map.get(pos).and_then(|chunk| chunk.upgrade())
     }
+}
 
-    pub fn get_block_state(&self, pos: BlockPos) -> Option<BlockState> {
-        let chunk_pos = ChunkPos::from(pos);
-        let chunk = self.get(&chunk_pos)?;
-        let chunk = chunk.read();
-        chunk.get_block_state(&ChunkBlockPos::from(pos), self.min_y)
+
+
+impl ChunkStorageTrait for WeakChunkStorage {
+    fn min_y(&self) -> i32 {
+        self.min_y
     }
 
-    pub fn get_fluid_state(&self, pos: BlockPos) -> Option<FluidState> {
-        let block_state = self.get_block_state(pos)?;
-        Some(FluidState::from(block_state))
+    fn height(&self) -> u32 {
+        self.height
     }
 
-    pub fn get_biome(&self, pos: BlockPos) -> Option<Biome> {
-        let chunk_pos = ChunkPos::from(pos);
-        let chunk = self.get(&chunk_pos)?;
-        let chunk = chunk.read();
-        chunk.get_biome(ChunkBiomePos::from(pos), self.min_y)
+    fn get_chunk(&self, pos: &ChunkPos) -> Option<Arc<RwLock<Chunk>>> {
+        self.get(pos)
     }
 
-    pub fn set_block_state(&self, pos: BlockPos, state: BlockState) -> Option<BlockState> {
-        if pos.y < self.min_y || pos.y >= (self.min_y + self.height as i32) {
-            return None;
+    fn upsert_chunk(&mut self, pos: ChunkPos, chunk: Chunk) -> Arc<RwLock<Chunk>> {
+        match self.map.entry(pos) {
+            Entry::Occupied(mut e) => {
+                if let Some(existing) = e.get_mut().upgrade() {
+                    *existing.write() = chunk;
+                    existing
+                } else {
+                    let arc = Arc::new(RwLock::new(chunk));
+                    e.insert(Arc::downgrade(&arc));
+                    arc
+                }
+            }
+            Entry::Vacant(e) => {
+                let arc = Arc::new(RwLock::new(chunk));
+                e.insert(Arc::downgrade(&arc));
+                arc
+            }
         }
-        let chunk_pos = ChunkPos::from(pos);
-        let chunk = self.get(&chunk_pos)?;
-        let mut chunk = chunk.write();
-        Some(chunk.get_and_set_block_state(&ChunkBlockPos::from(pos), state, self.min_y))
+    }
+
+    fn chunks(&self) -> Box<[&ChunkPos]> {
+        self.map.keys().collect::<Vec<_>>().into_boxed_slice()
+    }
+
+    fn clone_box(&self) -> Box<dyn ChunkStorageTrait> {
+        Box::new(self.clone())
+    }
+}
+
+impl Default for WeakChunkStorage {
+    fn default() -> Self {
+        Self::new(384, -64)
     }
 }
 
@@ -554,11 +651,6 @@ impl Section {
 impl Default for PartialChunkStorage {
     fn default() -> Self {
         Self::new(8)
-    }
-}
-impl Default for ChunkStorage {
-    fn default() -> Self {
-        Self::new(384, -64)
     }
 }
 

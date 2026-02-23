@@ -110,7 +110,7 @@ pub struct SectionBitsets {
 
 impl CachedWorld {
     pub fn new(world_lock: Arc<RwLock<World>>, origin: BlockPos) -> Self {
-        let min_y = world_lock.read().chunks.min_y;
+        let min_y = world_lock.read().chunks.min_y();
         Self {
             origin,
             min_y,
