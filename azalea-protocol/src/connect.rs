@@ -15,7 +15,7 @@ use azalea_auth::{
 use azalea_crypto::{Aes128CfbDec, Aes128CfbEnc};
 use thiserror::Error;
 use tokio::{
-    io::{AsyncWriteExt, BufStream},
+    io::{AsyncWriteExt, BufStream, BufWriter},
     net::{
         TcpStream,
         tcp::{OwnedReadHalf, OwnedWriteHalf, ReuniteError},
@@ -48,7 +48,7 @@ pub struct RawReadConnection {
 }
 
 pub struct RawWriteConnection {
-    pub write_stream: OwnedWriteHalf,
+    pub write_stream: BufWriter<OwnedWriteHalf>,
     pub compression_threshold: Option<u32>,
     pub enc_cipher: Option<Aes128CfbEnc>,
 }
@@ -168,7 +168,10 @@ impl RawReadConnection {
 }
 
 impl RawWriteConnection {
-    pub async fn write(&mut self, packet: &[u8]) -> io::Result<()> {
+    /// Write a packet into the send buffer without flushing to the socket.
+    /// Call [`flush`](Self::flush) to actually send buffered data, or use
+    /// [`write`](Self::write) to write and flush in one step.
+    pub async fn feed(&mut self, packet: &[u8]) -> io::Result<()> {
         if let Err(e) = write_raw_packet(
             packet,
             &mut self.write_stream,
@@ -177,7 +180,6 @@ impl RawWriteConnection {
         )
         .await
         {
-            // detect broken pipe
             if e.kind() == io::ErrorKind::BrokenPipe {
                 info!("Broken pipe, shutting down connection.");
                 if let Err(e) = self.shutdown().await {
@@ -189,7 +191,18 @@ impl RawWriteConnection {
         Ok(())
     }
 
-    /// End the connection.
+    /// Flush all buffered packets to the socket.
+    pub async fn flush(&mut self) -> io::Result<()> {
+        self.write_stream.flush().await
+    }
+
+    /// Write a packet and flush immediately. Equivalent to [`feed`](Self::feed) + [`flush`](Self::flush).
+    pub async fn write(&mut self, packet: &[u8]) -> io::Result<()> {
+        self.feed(packet).await?;
+        self.flush().await
+    }
+
+    /// End the connection. Flushes any buffered data before closing.
     pub async fn shutdown(&mut self) -> io::Result<()> {
         self.write_stream.shutdown().await
     }
@@ -218,12 +231,22 @@ impl<W> WriteConnection<W>
 where
     W: ProtocolPacket + Debug,
 {
-    /// Write a packet to the server.
+    /// Buffer a packet without flushing to the socket. Use [`flush`](Self::flush) to send.
+    pub async fn feed(&mut self, packet: W) -> io::Result<()> {
+        self.raw.feed(&serialize_packet(&packet).unwrap()).await
+    }
+
+    /// Flush all buffered packets to the socket.
+    pub async fn flush(&mut self) -> io::Result<()> {
+        self.raw.flush().await
+    }
+
+    /// Write a packet and flush immediately.
     pub async fn write(&mut self, packet: W) -> io::Result<()> {
         self.raw.write(&serialize_packet(&packet).unwrap()).await
     }
 
-    /// End the connection.
+    /// End the connection. Flushes any buffered data before closing.
     pub async fn shutdown(&mut self) -> io::Result<()> {
         self.raw.shutdown().await
     }
@@ -245,7 +268,18 @@ where
         self.reader.try_read()
     }
 
-    /// Write a packet to the other side of the connection.
+    /// Buffer a packet without flushing to the socket. Use [`flush`](Self::flush) to send.
+    pub async fn feed(&mut self, packet: impl crate::packets::Packet<W>) -> io::Result<()> {
+        let packet = packet.into_variant();
+        self.writer.feed(packet).await
+    }
+
+    /// Flush all buffered packets to the socket.
+    pub async fn flush(&mut self) -> io::Result<()> {
+        self.writer.flush().await
+    }
+
+    /// Write a packet and flush immediately.
     pub async fn write(&mut self, packet: impl crate::packets::Packet<W>) -> io::Result<()> {
         let packet = packet.into_variant();
         self.writer.write(packet).await
@@ -354,7 +388,7 @@ impl Connection<ClientboundHandshakePacket, ServerboundHandshakePacket> {
             },
             writer: WriteConnection {
                 raw: RawWriteConnection {
-                    write_stream,
+                    write_stream: BufWriter::new(write_stream),
                     compression_threshold: None,
                     enc_cipher: None,
                 },
@@ -639,7 +673,7 @@ where
             },
             writer: WriteConnection {
                 raw: RawWriteConnection {
-                    write_stream,
+                    write_stream: BufWriter::new(write_stream),
                     compression_threshold: None,
                     enc_cipher: None,
                 },
@@ -649,10 +683,12 @@ where
     }
 
     /// Convert from a `Connection` into a `TcpStream`. Useful for servers.
+    ///
+    /// Any unflushed buffered data is discarded.
     pub fn unwrap(self) -> Result<TcpStream, ReuniteError> {
         self.reader
             .raw
             .read_stream
-            .reunite(self.writer.raw.write_stream)
+            .reunite(self.writer.raw.write_stream.into_inner())
     }
 }

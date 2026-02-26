@@ -200,7 +200,7 @@ impl RawConnection {
             mpsc::unbounded_channel::<Box<[u8]>>();
 
         let writer_task =
-            task_pool.spawn(write_task(network_packet_writer_rx, writer.write_stream));
+            task_pool.spawn(write_task(network_packet_writer_rx, writer.write_stream.into_inner()));
 
         let mut conn = Self::new_networkless(state);
         conn.network = Some(NetworkConnection {
