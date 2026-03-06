@@ -31,7 +31,12 @@ pub trait BlockTrait: Debug + Any {
     ///
     /// This is a lossy conversion, as [`BlockKind`] doesn't contain any state
     /// data.
-    fn as_registry_block(&self) -> BlockKind;
+    fn as_block_kind(&self) -> BlockKind;
+    #[deprecated = "renamed to as_block_kind"]
+    #[doc(hidden)]
+    fn as_registry_block(&self) -> BlockKind {
+        self.as_block_kind()
+    }
 
     /// Returns a map of property names on this block to their values as
     /// strings.
@@ -118,11 +123,11 @@ mod tests {
     pub fn test_integer_properties() {
         // Test with oak sapling that has an integer-like stage property
         let sapling_stage_0 = crate::blocks::OakSapling {
-            stage: crate::properties::OakSaplingStage::_0,
+            stage: crate::properties::Stage::_0,
         };
 
         let sapling_stage_1 = crate::blocks::OakSapling {
-            stage: crate::properties::OakSaplingStage::_1,
+            stage: crate::properties::Stage::_1,
         };
 
         // Test stage 0
