@@ -45,7 +45,7 @@ bevy_utils = { workspace = true, features = ["debug"] }
 eyre.workspace = true
 
 [features]
-default = ["log", "packet-event", "online-mode"]
+default = ["log", "packet-event", "online-mode", "srv"]
 # enables bevy_log::LogPlugin by default
 log = ["bevy_log"]
 packet-event = []
@@ -54,6 +54,7 @@ online-mode = [
     "azalea-protocol/online-mode",
     "dep:reqwest",
 ]
+srv = ["azalea-protocol/srv"]
 
 [lints]
 workspace = true

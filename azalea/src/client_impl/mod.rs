@@ -19,11 +19,12 @@ use azalea_core::{
 };
 use azalea_entity::indexing::{EntityIdIndex, EntityUuidIndex};
 use azalea_protocol::{
-    address::{ResolvableAddr, ResolvedAddr},
+    address::ResolvedAddr,
     connect::Proxy,
     packets::{Packet, game::ServerboundGamePacket},
-    resolve::ResolveError,
 };
+#[cfg(feature = "srv")]
+use azalea_protocol::{address::ResolvableAddr, resolve::ResolveError};
 use azalea_registry::{DataRegistryKeyRef, identifier::Identifier};
 use azalea_world::{PartialWorld, World, WorldName};
 use bevy_app::{App, AppExit};
@@ -180,6 +181,7 @@ impl Client {
     ///     Ok(())
     /// }
     /// ```
+    #[cfg(feature = "srv")]
     pub async fn join(
         account: Account,
         address: impl ResolvableAddr,
@@ -191,6 +193,7 @@ impl Client {
         Ok((client, rx))
     }
 
+    #[cfg(feature = "srv")]
     pub async fn join_with_proxy(
         account: Account,
         address: impl ResolvableAddr,

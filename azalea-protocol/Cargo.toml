@@ -42,15 +42,16 @@ thiserror.workspace = true
 tokio = { workspace = true, features = ["io-util", "net", "macros"] }
 tokio-util = { workspace = true, features = ["codec"] }
 tracing.workspace = true
-hickory-resolver = { workspace = true, features = ["tokio", "system-config"] }
+hickory-resolver = { workspace = true, features = ["tokio", "system-config"], optional = true }
 uuid.workspace = true
 indexmap.workspace = true
 reqwest = { workspace = true, optional = true, features = ["socks"] }
 
 [features]
-default = ["online-mode", "connecting"]
+default = ["online-mode", "connecting", "srv"]
 connecting = []
 online-mode = ["azalea-auth/online-mode", "dep:reqwest"]
+srv = ["dep:hickory-resolver"]
 bevy_ecs = [
     "dep:bevy_ecs",
     "dep:azalea-world",

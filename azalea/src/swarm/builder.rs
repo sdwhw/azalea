@@ -9,7 +9,9 @@ use std::{
 };
 
 use azalea_client::{DefaultPlugins, account::Account, start_ecs_runner};
-use azalea_protocol::address::{ResolvableAddr, ResolvedAddr};
+use azalea_protocol::address::ResolvedAddr;
+#[cfg(feature = "srv")]
+use azalea_protocol::address::ResolvableAddr;
 use azalea_world::Worlds;
 use bevy_app::{App, AppExit, Plugins, SubApp};
 use bevy_ecs::{component::Component, resource::Resource};
@@ -381,10 +383,12 @@ where
     /// [`ServerAddr`]: ../../azalea_protocol/address/struct.ServerAddr.html
     /// [`ResolvedAddr`]: ../../azalea_protocol/address/struct.ResolvedAddr.html
     /// [`ResolvableAddr`]: ../../azalea_protocol/address/trait.ResolvableAddr.html
+    #[cfg(feature = "srv")]
     pub async fn start(self, address: impl ResolvableAddr) -> AppExit {
         self.start_with_opts(address, JoinOpts::default()).await
     }
 
+    #[cfg(feature = "srv")]
     #[doc(hidden)]
     #[deprecated = "renamed to `start_with_opts`."]
     pub async fn start_with_default_opts(
@@ -397,19 +401,12 @@ where
 
     /// Do the same as [`Self::start`], but allow passing in default join
     /// options for the bots.
+    #[cfg(feature = "srv")]
     pub async fn start_with_opts(
-        mut self,
+        self,
         address: impl ResolvableAddr,
         join_opts: JoinOpts,
     ) -> AppExit {
-        assert_eq!(
-            self.accounts.len(),
-            self.states.len(),
-            "There must be exactly one state per bot."
-        );
-
-        debug!("Starting Azalea {}", env!("CARGO_PKG_VERSION"));
-
         let address = if let Some(socket_addr) = join_opts.custom_socket_addr {
             let server_addr = if let Some(server_addr) = join_opts
                 .custom_server_addr
@@ -437,6 +434,26 @@ where
             };
             addr
         };
+
+        self.start_resolved(address, join_opts).await
+    }
+
+    /// Start the swarm with an already-resolved address.
+    ///
+    /// This is useful when the `srv` feature is disabled or when you've
+    /// already resolved the address yourself.
+    pub async fn start_resolved(
+        mut self,
+        address: ResolvedAddr,
+        join_opts: JoinOpts,
+    ) -> AppExit {
+        assert_eq!(
+            self.accounts.len(),
+            self.states.len(),
+            "There must be exactly one state per bot."
+        );
+
+        debug!("Starting Azalea {}", env!("CARGO_PKG_VERSION"));
 
         let worlds = Arc::new(RwLock::new(Worlds::default()));
 

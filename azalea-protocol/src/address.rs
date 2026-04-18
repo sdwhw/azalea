@@ -4,18 +4,22 @@ use std::{
     str::FromStr,
 };
 
+#[cfg(feature = "srv")]
 use hickory_resolver::ResolveError;
 
+#[cfg(feature = "srv")]
 use crate::resolve::resolve_address;
 
 /// Something that might be able to be parsed and looked up as a server address.
 ///
 /// This is typically used by Azalea as a generic argument, so the user can
 /// choose to pass either a string or an already-resolved address.
+#[cfg(feature = "srv")]
 pub trait ResolvableAddr: Debug + Clone {
     fn server_addr(self) -> Result<ServerAddr, ResolveError>;
     fn resolve(self) -> impl Future<Output = Result<ResolvedAddr, ResolveError>> + Send;
 }
+#[cfg(feature = "srv")]
 impl<T: TryInto<ServerAddr, Error = ServerAddrParseError> + Debug + Send + Clone> ResolvableAddr
     for T
 {
@@ -29,6 +33,7 @@ impl<T: TryInto<ServerAddr, Error = ServerAddrParseError> + Debug + Send + Clone
     }
 }
 
+#[cfg(feature = "srv")]
 impl ResolvableAddr for &ResolvedAddr {
     fn server_addr(self) -> Result<ServerAddr, ResolveError> {
         Ok(self.server.clone())
@@ -149,6 +154,7 @@ pub struct ResolvedAddr {
 }
 
 impl ResolvedAddr {
+    #[cfg(feature = "srv")]
     pub async fn new(server: impl Into<ServerAddr>) -> Result<Self, ResolveError> {
         let server = server.into();
         let socket = resolve_address(&server).await?;

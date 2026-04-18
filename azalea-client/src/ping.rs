@@ -3,8 +3,8 @@
 use std::io;
 
 use azalea_protocol::{
-    address::{ResolvableAddr, ServerAddr},
-    connect::{Connection, ConnectionError, Proxy},
+    address::ServerAddr,
+    connect::{Connection, ConnectionError},
     packets::{
         ClientIntention, PROTOCOL_VERSION,
         handshake::{
@@ -16,14 +16,16 @@ use azalea_protocol::{
             s_status_request::ServerboundStatusRequest,
         },
     },
-    resolve,
 };
+#[cfg(feature = "srv")]
+use azalea_protocol::{address::ResolvableAddr, connect::Proxy, resolve};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum PingError {
+    #[cfg(feature = "srv")]
     #[error("{0}")]
-    Resolve(#[from] resolve::ResolveError),
+    Resolve(#[from] azalea_protocol::resolve::ResolveError),
     #[error("{0}")]
     Connection(#[from] ConnectionError),
     #[error("{0}")]
@@ -47,6 +49,7 @@ pub enum PingError {
 ///     println!("{}", response.description.to_ansi());
 /// }
 /// ```
+#[cfg(feature = "srv")]
 pub async fn ping_server(
     address: impl ResolvableAddr,
 ) -> Result<ClientboundStatusResponse, PingError> {
@@ -56,6 +59,7 @@ pub async fn ping_server(
 }
 
 /// Ping a Minecraft server through a SOCKS5 proxy.
+#[cfg(feature = "srv")]
 pub async fn ping_server_with_proxy(
     address: impl ResolvableAddr,
     proxy: Proxy,

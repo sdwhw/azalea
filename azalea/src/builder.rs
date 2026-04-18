@@ -1,15 +1,22 @@
 use std::time::Duration;
 
-use azalea_client::{DefaultPlugins, account::Account};
+use azalea_client::DefaultPlugins;
+#[cfg(feature = "srv")]
+use azalea_client::account::Account;
+#[cfg(feature = "srv")]
 use azalea_protocol::address::ResolvableAddr;
-use bevy_app::{AppExit, Plugins};
+#[cfg(feature = "srv")]
+use bevy_app::AppExit;
+use bevy_app::Plugins;
 use bevy_ecs::component::Component;
 
 use crate::{
-    HandleFn, JoinOpts, NoState,
+    HandleFn, NoState,
     bot::DefaultBotPlugins,
     swarm::{self, SwarmBuilder},
 };
+#[cfg(feature = "srv")]
+use crate::JoinOpts;
 
 /// A builder for creating new [`Client`](crate::Client)s. This is the
 /// recommended way of making a bot.
@@ -179,6 +186,7 @@ where
     /// [`ServerAddr`]: ../azalea_protocol/address/struct.ServerAddr.html
     /// [`ResolvedAddr`]: ../azalea_protocol/address/struct.ResolvedAddr.html
     /// [`ResolvableAddr`]: ../azalea_protocol/address/trait.ResolvableAddr.html
+    #[cfg(feature = "srv")]
     pub async fn start(mut self, account: Account, address: impl ResolvableAddr) -> AppExit {
         self.swarm.accounts = vec![(account, JoinOpts::default())];
         if self.swarm.states.is_empty() {
@@ -189,6 +197,7 @@ where
 
     /// Do the same as [`Self::start`], but allow passing in custom join
     /// options.
+    #[cfg(feature = "srv")]
     pub async fn start_with_opts(
         mut self,
         account: Account,

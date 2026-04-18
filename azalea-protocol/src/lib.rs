@@ -8,6 +8,7 @@ pub mod common;
 pub mod connect;
 pub mod packets;
 pub mod read;
+#[cfg(feature = "srv")]
 pub mod resolve;
 pub mod write;
 
@@ -17,6 +18,7 @@ pub use azalea_protocol_macros;
 // re-export to make it easier for users to have the correct version
 pub use simdnbt;
 
+#[cfg(feature = "srv")]
 #[doc(hidden)]
 #[deprecated(note = "renamed to `resolve`.")]
 pub mod resolver {
