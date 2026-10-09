@@ -16,6 +16,7 @@
 //! - [AbstractEntity]
 //!   - [AreaEffectCloud]
 //!   - [BreezeWindCharge]
+//!   - [Cushion]
 //!   - [DragonFireball]
 //!   - [EndCrystal]
 //!   - [EvokerFangs]
@@ -68,11 +69,8 @@
 //!         - [Tadpole]
 //!         - [AbstractAgeable]
 //!           - [Dolphin]
-//!           - [MagmaCube]
-//!           - [Slime]
 //!           - [Squid]
 //!             - [GlowSquid]
-//!           - [SulfurCube]
 //!           - [AbstractAnimal]
 //!             - [Armadillo]
 //!             - [Axolotl]
@@ -112,6 +110,10 @@
 //!               - [AbstractNautilus]
 //!                 - [Nautilus]
 //!                 - [ZombieNautilus]
+//!           - [AbstractCubeMob]
+//!             - [MagmaCube]
+//!             - [Slime]
+//!             - [SulfurCube]
 //!           - [AbstractVillager]
 //!             - [Villager]
 //!             - [WanderingTrader]
@@ -184,6 +186,8 @@
 //!       - [OakChestBoat]
 //!       - [PaleOakBoat]
 //!       - [PaleOakChestBoat]
+//!       - [PoplarBoat]
+//!       - [PoplarChestBoat]
 //!       - [SpruceBoat]
 //!       - [SpruceChestBoat]
 //!     - [AbstractMinecart]
@@ -202,7 +206,10 @@ use azalea_core::{
     direction::Direction,
     position::{BlockPos, Vec3f32},
 };
-use azalea_inventory::{ItemStack, components};
+use azalea_inventory::{
+    ItemStack,
+    components::{self, DyeColor},
+};
 use azalea_registry::{DataRegistry, builtin::EntityKind};
 use bevy_ecs::{bundle::Bundle, component::Component};
 use derive_more::{Deref, DerefMut};
@@ -294,6 +301,7 @@ pub struct TicksFrozen(pub i32);
 ///
 /// - [AreaEffectCloud]
 /// - [BreezeWindCharge]
+/// - [Cushion]
 /// - [DragonFireball]
 /// - [EndCrystal]
 /// - [EvokerFangs]
@@ -346,11 +354,8 @@ pub struct TicksFrozen(pub i32);
 ///       - [Tadpole]
 ///       - [AbstractAgeable]
 ///         - [Dolphin]
-///         - [MagmaCube]
-///         - [Slime]
 ///         - [Squid]
 ///           - [GlowSquid]
-///         - [SulfurCube]
 ///         - [AbstractAnimal]
 ///           - [Armadillo]
 ///           - [Axolotl]
@@ -390,6 +395,10 @@ pub struct TicksFrozen(pub i32);
 ///             - [AbstractNautilus]
 ///               - [Nautilus]
 ///               - [ZombieNautilus]
+///         - [AbstractCubeMob]
+///           - [MagmaCube]
+///           - [Slime]
+///           - [SulfurCube]
 ///         - [AbstractVillager]
 ///           - [Villager]
 ///           - [WanderingTrader]
@@ -462,6 +471,8 @@ pub struct TicksFrozen(pub i32);
 ///     - [OakChestBoat]
 ///     - [PaleOakBoat]
 ///     - [PaleOakChestBoat]
+///     - [PoplarBoat]
+///     - [PoplarChestBoat]
 ///     - [SpruceBoat]
 ///     - [SpruceChestBoat]
 ///   - [AbstractMinecart]
@@ -679,6 +690,65 @@ impl Default for BreezeWindChargeMetadataBundle {
         Self {
             _marker: BreezeWindCharge,
             parent: Default::default(),
+        }
+    }
+}
+
+/// A metadata field for [Cushion].
+#[derive(Component, Deref, DerefMut, Clone, PartialEq)]
+pub struct CushionColor(pub DyeColor);
+/// The marker component for entities of type `minecraft:cushion`.
+///
+/// # Metadata
+///
+/// These are the metadata components that all `Cushion` entities are guaranteed
+/// to have, in addition to the metadata components from parent types:
+///
+/// - [CushionColor]
+///
+/// # Parents
+///
+/// Entities with `Cushion` will also have the following marker components and
+/// their metadata fields:
+///
+/// - [AbstractEntity]
+///
+/// # Children
+///
+/// This entity type has no children types.
+#[derive(Component)]
+pub struct Cushion;
+impl Cushion {
+    fn apply_metadata(
+        entity: &mut bevy_ecs::system::EntityCommands,
+        d: EntityDataItem,
+    ) -> Result<(), UpdateMetadataError> {
+        match d.index {
+            0..=7 => AbstractEntity::apply_metadata(entity, d)?,
+            8 => {
+                entity.insert(CushionColor(d.value.into_dye_color()?));
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+}
+
+/// The metadata bundle for [Cushion].
+///
+/// This type should generally not be used directly.
+#[derive(Bundle)]
+pub struct CushionMetadataBundle {
+    _marker: Cushion,
+    parent: AbstractEntityMetadataBundle,
+    cushion_color: CushionColor,
+}
+impl Default for CushionMetadataBundle {
+    fn default() -> Self {
+        Self {
+            _marker: Cushion,
+            parent: Default::default(),
+            cushion_color: CushionColor(Default::default()),
         }
     }
 }
@@ -2886,11 +2956,8 @@ pub struct SleepingPos(pub Option<BlockPos>);
 ///     - [Tadpole]
 ///     - [AbstractAgeable]
 ///       - [Dolphin]
-///       - [MagmaCube]
-///       - [Slime]
 ///       - [Squid]
 ///         - [GlowSquid]
-///       - [SulfurCube]
 ///       - [AbstractAnimal]
 ///         - [Armadillo]
 ///         - [Axolotl]
@@ -2930,6 +2997,10 @@ pub struct SleepingPos(pub Option<BlockPos>);
 ///           - [AbstractNautilus]
 ///             - [Nautilus]
 ///             - [ZombieNautilus]
+///       - [AbstractCubeMob]
+///         - [MagmaCube]
+///         - [Slime]
+///         - [SulfurCube]
 ///       - [AbstractVillager]
 ///         - [Villager]
 ///         - [WanderingTrader]
@@ -3467,11 +3538,8 @@ pub struct Aggressive(pub bool);
 ///   - [Tadpole]
 ///   - [AbstractAgeable]
 ///     - [Dolphin]
-///     - [MagmaCube]
-///     - [Slime]
 ///     - [Squid]
 ///       - [GlowSquid]
-///     - [SulfurCube]
 ///     - [AbstractAnimal]
 ///       - [Armadillo]
 ///       - [Axolotl]
@@ -3511,6 +3579,10 @@ pub struct Aggressive(pub bool);
 ///         - [AbstractNautilus]
 ///           - [Nautilus]
 ///           - [ZombieNautilus]
+///     - [AbstractCubeMob]
+///       - [MagmaCube]
+///       - [Slime]
+///       - [SulfurCube]
 ///     - [AbstractVillager]
 ///       - [Villager]
 ///       - [WanderingTrader]
@@ -3873,11 +3945,8 @@ impl Default for PhantomMetadataBundle {
 /// - [Tadpole]
 /// - [AbstractAgeable]
 ///   - [Dolphin]
-///   - [MagmaCube]
-///   - [Slime]
 ///   - [Squid]
 ///     - [GlowSquid]
-///   - [SulfurCube]
 ///   - [AbstractAnimal]
 ///     - [Armadillo]
 ///     - [Axolotl]
@@ -3917,6 +3986,10 @@ impl Default for PhantomMetadataBundle {
 ///       - [AbstractNautilus]
 ///         - [Nautilus]
 ///         - [ZombieNautilus]
+///   - [AbstractCubeMob]
+///     - [MagmaCube]
+///     - [Slime]
+///     - [SulfurCube]
 ///   - [AbstractVillager]
 ///     - [Villager]
 ///     - [WanderingTrader]
@@ -4281,7 +4354,7 @@ pub struct AttachFace(pub Direction);
 pub struct Peek(pub u8);
 /// A metadata field for [Shulker].
 #[derive(Component, Deref, DerefMut, Clone, PartialEq)]
-pub struct Color(pub u8);
+pub struct ShulkerColor(pub u8);
 /// The marker component for entities of type `minecraft:shulker`.
 ///
 /// # Metadata
@@ -4291,7 +4364,7 @@ pub struct Color(pub u8);
 ///
 /// - [AttachFace]
 /// - [Peek]
-/// - [Color]
+/// - [ShulkerColor]
 ///
 /// # Parents
 ///
@@ -4322,7 +4395,7 @@ impl Shulker {
                 entity.insert(Peek(d.value.into_byte()?));
             }
             18 => {
-                entity.insert(Color(d.value.into_byte()?));
+                entity.insert(ShulkerColor(d.value.into_byte()?));
             }
             _ => {}
         }
@@ -4339,7 +4412,7 @@ pub struct ShulkerMetadataBundle {
     parent: AbstractCreatureMetadataBundle,
     attach_face: AttachFace,
     peek: Peek,
-    color: Color,
+    shulker_color: ShulkerColor,
 }
 impl Default for ShulkerMetadataBundle {
     fn default() -> Self {
@@ -4348,7 +4421,7 @@ impl Default for ShulkerMetadataBundle {
             parent: Default::default(),
             attach_face: AttachFace(Default::default()),
             peek: Peek(0),
-            color: Color(16),
+            shulker_color: ShulkerColor(16),
         }
     }
 }
@@ -4518,11 +4591,8 @@ pub struct AbstractAgeableAgeLocked(pub bool);
 /// # Children
 ///
 /// - [Dolphin]
-/// - [MagmaCube]
-/// - [Slime]
 /// - [Squid]
 ///   - [GlowSquid]
-/// - [SulfurCube]
 /// - [AbstractAnimal]
 ///   - [Armadillo]
 ///   - [Axolotl]
@@ -4562,6 +4632,10 @@ pub struct AbstractAgeableAgeLocked(pub bool);
 ///     - [AbstractNautilus]
 ///       - [Nautilus]
 ///       - [ZombieNautilus]
+/// - [AbstractCubeMob]
+///   - [MagmaCube]
+///   - [Slime]
+///   - [SulfurCube]
 /// - [AbstractVillager]
 ///   - [Villager]
 ///   - [WanderingTrader]
@@ -4675,133 +4749,6 @@ impl Default for DolphinMetadataBundle {
             parent: Default::default(),
             got_fish: GotFish(false),
             moistness_level: MoistnessLevel(2400),
-        }
-    }
-}
-
-/// A metadata field for [MagmaCube].
-#[derive(Component, Deref, DerefMut, Clone, PartialEq)]
-pub struct MagmaCubeSize(pub i32);
-/// The marker component for entities of type `minecraft:magma_cube`.
-///
-/// # Metadata
-///
-/// These are the metadata components that all `MagmaCube` entities are
-/// guaranteed to have, in addition to the metadata components from parent
-/// types:
-///
-/// - [MagmaCubeSize]
-///
-/// # Parents
-///
-/// Entities with `MagmaCube` will also have the following marker components and
-/// their metadata fields:
-///
-/// - [AbstractAgeable]
-/// - [AbstractCreature]
-/// - [AbstractInsentient]
-/// - [AbstractLiving]
-/// - [AbstractEntity]
-///
-/// # Children
-///
-/// This entity type has no children types.
-#[derive(Component)]
-pub struct MagmaCube;
-impl MagmaCube {
-    fn apply_metadata(
-        entity: &mut bevy_ecs::system::EntityCommands,
-        d: EntityDataItem,
-    ) -> Result<(), UpdateMetadataError> {
-        match d.index {
-            0..=17 => AbstractAgeable::apply_metadata(entity, d)?,
-            18 => {
-                entity.insert(MagmaCubeSize(d.value.into_int()?));
-            }
-            _ => {}
-        }
-        Ok(())
-    }
-}
-
-/// The metadata bundle for [MagmaCube].
-///
-/// This type should generally not be used directly.
-#[derive(Bundle)]
-pub struct MagmaCubeMetadataBundle {
-    _marker: MagmaCube,
-    parent: AbstractAgeableMetadataBundle,
-    magma_cube_size: MagmaCubeSize,
-}
-impl Default for MagmaCubeMetadataBundle {
-    fn default() -> Self {
-        Self {
-            _marker: MagmaCube,
-            parent: Default::default(),
-            magma_cube_size: MagmaCubeSize(1),
-        }
-    }
-}
-
-/// A metadata field for [Slime].
-#[derive(Component, Deref, DerefMut, Clone, PartialEq)]
-pub struct SlimeSize(pub i32);
-/// The marker component for entities of type `minecraft:slime`.
-///
-/// # Metadata
-///
-/// These are the metadata components that all `Slime` entities are guaranteed
-/// to have, in addition to the metadata components from parent types:
-///
-/// - [SlimeSize]
-///
-/// # Parents
-///
-/// Entities with `Slime` will also have the following marker components and
-/// their metadata fields:
-///
-/// - [AbstractAgeable]
-/// - [AbstractCreature]
-/// - [AbstractInsentient]
-/// - [AbstractLiving]
-/// - [AbstractEntity]
-///
-/// # Children
-///
-/// This entity type has no children types.
-#[derive(Component)]
-pub struct Slime;
-impl Slime {
-    fn apply_metadata(
-        entity: &mut bevy_ecs::system::EntityCommands,
-        d: EntityDataItem,
-    ) -> Result<(), UpdateMetadataError> {
-        match d.index {
-            0..=17 => AbstractAgeable::apply_metadata(entity, d)?,
-            18 => {
-                entity.insert(SlimeSize(d.value.into_int()?));
-            }
-            _ => {}
-        }
-        Ok(())
-    }
-}
-
-/// The metadata bundle for [Slime].
-///
-/// This type should generally not be used directly.
-#[derive(Bundle)]
-pub struct SlimeMetadataBundle {
-    _marker: Slime,
-    parent: AbstractAgeableMetadataBundle,
-    slime_size: SlimeSize,
-}
-impl Default for SlimeMetadataBundle {
-    fn default() -> Self {
-        Self {
-            _marker: Slime,
-            parent: Default::default(),
-            slime_size: SlimeSize(1),
         }
     }
 }
@@ -4920,88 +4867,6 @@ impl Default for GlowSquidMetadataBundle {
             _marker: GlowSquid,
             parent: Default::default(),
             dark_ticks_remaining: DarkTicksRemaining(0),
-        }
-    }
-}
-
-/// A metadata field for [SulfurCube].
-#[derive(Component, Deref, DerefMut, Clone, PartialEq)]
-pub struct SulfurCubeSize(pub i32);
-/// A metadata field for [SulfurCube].
-#[derive(Component, Deref, DerefMut, Clone, PartialEq)]
-pub struct MaxFuse(pub i32);
-/// A metadata field for [SulfurCube].
-#[derive(Component, Deref, DerefMut, Clone, PartialEq)]
-pub struct SulfurCubeFromBucket(pub bool);
-/// The marker component for entities of type `minecraft:sulfur_cube`.
-///
-/// # Metadata
-///
-/// These are the metadata components that all `SulfurCube` entities are
-/// guaranteed to have, in addition to the metadata components from parent
-/// types:
-///
-/// - [SulfurCubeSize]
-/// - [MaxFuse]
-/// - [SulfurCubeFromBucket]
-///
-/// # Parents
-///
-/// Entities with `SulfurCube` will also have the following marker components
-/// and their metadata fields:
-///
-/// - [AbstractAgeable]
-/// - [AbstractCreature]
-/// - [AbstractInsentient]
-/// - [AbstractLiving]
-/// - [AbstractEntity]
-///
-/// # Children
-///
-/// This entity type has no children types.
-#[derive(Component)]
-pub struct SulfurCube;
-impl SulfurCube {
-    fn apply_metadata(
-        entity: &mut bevy_ecs::system::EntityCommands,
-        d: EntityDataItem,
-    ) -> Result<(), UpdateMetadataError> {
-        match d.index {
-            0..=17 => AbstractAgeable::apply_metadata(entity, d)?,
-            18 => {
-                entity.insert(SulfurCubeSize(d.value.into_int()?));
-            }
-            19 => {
-                entity.insert(MaxFuse(d.value.into_int()?));
-            }
-            20 => {
-                entity.insert(SulfurCubeFromBucket(d.value.into_boolean()?));
-            }
-            _ => {}
-        }
-        Ok(())
-    }
-}
-
-/// The metadata bundle for [SulfurCube].
-///
-/// This type should generally not be used directly.
-#[derive(Bundle)]
-pub struct SulfurCubeMetadataBundle {
-    _marker: SulfurCube,
-    parent: AbstractAgeableMetadataBundle,
-    sulfur_cube_size: SulfurCubeSize,
-    max_fuse: MaxFuse,
-    sulfur_cube_from_bucket: SulfurCubeFromBucket,
-}
-impl Default for SulfurCubeMetadataBundle {
-    fn default() -> Self {
-        Self {
-            _marker: SulfurCube,
-            parent: Default::default(),
-            sulfur_cube_size: SulfurCubeSize(1),
-            max_fuse: MaxFuse(-1),
-            sulfur_cube_from_bucket: SulfurCubeFromBucket(false),
         }
     }
 }
@@ -7921,6 +7786,254 @@ impl Default for ZombieNautilusMetadataBundle {
             zombie_nautilus_variant: ZombieNautilusVariant(
                 azalea_registry::data::ZombieNautilusVariant::new_raw(0),
             ),
+        }
+    }
+}
+
+/// A metadata field for [AbstractCubeMob].
+#[derive(Component, Deref, DerefMut, Clone, PartialEq)]
+pub struct AbstractCubeMobSize(pub i32);
+/// An abstract entity marker component.
+///
+/// # Metadata
+///
+/// These are the metadata components that all `AbstractCubeMob` entities are
+/// guaranteed to have, in addition to the metadata components from parent
+/// types:
+///
+/// - [AbstractCubeMobSize]
+///
+/// # Parents
+///
+/// Entities with `AbstractCubeMob` will also have the following marker
+/// components and their metadata fields:
+///
+/// - [AbstractAgeable]
+/// - [AbstractCreature]
+/// - [AbstractInsentient]
+/// - [AbstractLiving]
+/// - [AbstractEntity]
+///
+/// # Children
+///
+/// - [MagmaCube]
+/// - [Slime]
+/// - [SulfurCube]
+#[derive(Component)]
+pub struct AbstractCubeMob;
+impl AbstractCubeMob {
+    fn apply_metadata(
+        entity: &mut bevy_ecs::system::EntityCommands,
+        d: EntityDataItem,
+    ) -> Result<(), UpdateMetadataError> {
+        match d.index {
+            0..=17 => AbstractAgeable::apply_metadata(entity, d)?,
+            18 => {
+                entity.insert(AbstractCubeMobSize(d.value.into_int()?));
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+}
+
+/// The metadata bundle for [AbstractCubeMob].
+///
+/// This type should generally not be used directly.
+#[derive(Bundle)]
+pub struct AbstractCubeMobMetadataBundle {
+    _marker: AbstractCubeMob,
+    parent: AbstractAgeableMetadataBundle,
+    abstract_cube_mob_size: AbstractCubeMobSize,
+}
+impl Default for AbstractCubeMobMetadataBundle {
+    fn default() -> Self {
+        Self {
+            _marker: AbstractCubeMob,
+            parent: Default::default(),
+            abstract_cube_mob_size: AbstractCubeMobSize(1),
+        }
+    }
+}
+
+/// The marker component for entities of type `minecraft:magma_cube`.
+///
+/// # Metadata
+///
+/// This entity type does not add any additional metadata. It will still have
+/// metadata from parent types.
+///
+/// # Parents
+///
+/// Entities with `MagmaCube` will also have the following marker components and
+/// their metadata fields:
+///
+/// - [AbstractCubeMob]
+/// - [AbstractAgeable]
+/// - [AbstractCreature]
+/// - [AbstractInsentient]
+/// - [AbstractLiving]
+/// - [AbstractEntity]
+///
+/// # Children
+///
+/// This entity type has no children types.
+#[derive(Component)]
+pub struct MagmaCube;
+impl MagmaCube {
+    fn apply_metadata(
+        entity: &mut bevy_ecs::system::EntityCommands,
+        d: EntityDataItem,
+    ) -> Result<(), UpdateMetadataError> {
+        match d.index {
+            0..=18 => AbstractCubeMob::apply_metadata(entity, d)?,
+            _ => {}
+        }
+        Ok(())
+    }
+}
+
+/// The metadata bundle for [MagmaCube].
+///
+/// This type should generally not be used directly.
+#[derive(Bundle)]
+pub struct MagmaCubeMetadataBundle {
+    _marker: MagmaCube,
+    parent: AbstractCubeMobMetadataBundle,
+}
+impl Default for MagmaCubeMetadataBundle {
+    fn default() -> Self {
+        Self {
+            _marker: MagmaCube,
+            parent: Default::default(),
+        }
+    }
+}
+
+/// The marker component for entities of type `minecraft:slime`.
+///
+/// # Metadata
+///
+/// This entity type does not add any additional metadata. It will still have
+/// metadata from parent types.
+///
+/// # Parents
+///
+/// Entities with `Slime` will also have the following marker components and
+/// their metadata fields:
+///
+/// - [AbstractCubeMob]
+/// - [AbstractAgeable]
+/// - [AbstractCreature]
+/// - [AbstractInsentient]
+/// - [AbstractLiving]
+/// - [AbstractEntity]
+///
+/// # Children
+///
+/// This entity type has no children types.
+#[derive(Component)]
+pub struct Slime;
+impl Slime {
+    fn apply_metadata(
+        entity: &mut bevy_ecs::system::EntityCommands,
+        d: EntityDataItem,
+    ) -> Result<(), UpdateMetadataError> {
+        match d.index {
+            0..=18 => AbstractCubeMob::apply_metadata(entity, d)?,
+            _ => {}
+        }
+        Ok(())
+    }
+}
+
+/// The metadata bundle for [Slime].
+///
+/// This type should generally not be used directly.
+#[derive(Bundle)]
+pub struct SlimeMetadataBundle {
+    _marker: Slime,
+    parent: AbstractCubeMobMetadataBundle,
+}
+impl Default for SlimeMetadataBundle {
+    fn default() -> Self {
+        Self {
+            _marker: Slime,
+            parent: Default::default(),
+        }
+    }
+}
+
+/// A metadata field for [SulfurCube].
+#[derive(Component, Deref, DerefMut, Clone, PartialEq)]
+pub struct MaxFuse(pub i32);
+/// A metadata field for [SulfurCube].
+#[derive(Component, Deref, DerefMut, Clone, PartialEq)]
+pub struct SulfurCubeFromBucket(pub bool);
+/// The marker component for entities of type `minecraft:sulfur_cube`.
+///
+/// # Metadata
+///
+/// These are the metadata components that all `SulfurCube` entities are
+/// guaranteed to have, in addition to the metadata components from parent
+/// types:
+///
+/// - [MaxFuse]
+/// - [SulfurCubeFromBucket]
+///
+/// # Parents
+///
+/// Entities with `SulfurCube` will also have the following marker components
+/// and their metadata fields:
+///
+/// - [AbstractCubeMob]
+/// - [AbstractAgeable]
+/// - [AbstractCreature]
+/// - [AbstractInsentient]
+/// - [AbstractLiving]
+/// - [AbstractEntity]
+///
+/// # Children
+///
+/// This entity type has no children types.
+#[derive(Component)]
+pub struct SulfurCube;
+impl SulfurCube {
+    fn apply_metadata(
+        entity: &mut bevy_ecs::system::EntityCommands,
+        d: EntityDataItem,
+    ) -> Result<(), UpdateMetadataError> {
+        match d.index {
+            0..=18 => AbstractCubeMob::apply_metadata(entity, d)?,
+            19 => {
+                entity.insert(MaxFuse(d.value.into_int()?));
+            }
+            20 => {
+                entity.insert(SulfurCubeFromBucket(d.value.into_boolean()?));
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+}
+
+/// The metadata bundle for [SulfurCube].
+///
+/// This type should generally not be used directly.
+#[derive(Bundle)]
+pub struct SulfurCubeMetadataBundle {
+    _marker: SulfurCube,
+    parent: AbstractCubeMobMetadataBundle,
+    max_fuse: MaxFuse,
+    sulfur_cube_from_bucket: SulfurCubeFromBucket,
+}
+impl Default for SulfurCubeMetadataBundle {
+    fn default() -> Self {
+        Self {
+            _marker: SulfurCube,
+            parent: Default::default(),
+            max_fuse: MaxFuse(-1),
+            sulfur_cube_from_bucket: SulfurCubeFromBucket(false),
         }
     }
 }
@@ -11230,6 +11343,8 @@ pub struct Damage(pub f32);
 ///   - [OakChestBoat]
 ///   - [PaleOakBoat]
 ///   - [PaleOakChestBoat]
+///   - [PoplarBoat]
+///   - [PoplarChestBoat]
 ///   - [SpruceBoat]
 ///   - [SpruceChestBoat]
 /// - [AbstractMinecart]
@@ -11336,6 +11451,8 @@ pub struct BubbleTime(pub i32);
 /// - [OakChestBoat]
 /// - [PaleOakBoat]
 /// - [PaleOakChestBoat]
+/// - [PoplarBoat]
+/// - [PoplarChestBoat]
 /// - [SpruceBoat]
 /// - [SpruceChestBoat]
 #[derive(Component)]
@@ -12303,6 +12420,108 @@ impl Default for PaleOakChestBoatMetadataBundle {
     }
 }
 
+/// The marker component for entities of type `minecraft:poplar_boat`.
+///
+/// # Metadata
+///
+/// This entity type does not add any additional metadata. It will still have
+/// metadata from parent types.
+///
+/// # Parents
+///
+/// Entities with `PoplarBoat` will also have the following marker components
+/// and their metadata fields:
+///
+/// - [AbstractBoat]
+/// - [AbstractVehicle]
+/// - [AbstractEntity]
+///
+/// # Children
+///
+/// This entity type has no children types.
+#[derive(Component)]
+pub struct PoplarBoat;
+impl PoplarBoat {
+    fn apply_metadata(
+        entity: &mut bevy_ecs::system::EntityCommands,
+        d: EntityDataItem,
+    ) -> Result<(), UpdateMetadataError> {
+        match d.index {
+            0..=13 => AbstractBoat::apply_metadata(entity, d)?,
+            _ => {}
+        }
+        Ok(())
+    }
+}
+
+/// The metadata bundle for [PoplarBoat].
+///
+/// This type should generally not be used directly.
+#[derive(Bundle)]
+pub struct PoplarBoatMetadataBundle {
+    _marker: PoplarBoat,
+    parent: AbstractBoatMetadataBundle,
+}
+impl Default for PoplarBoatMetadataBundle {
+    fn default() -> Self {
+        Self {
+            _marker: PoplarBoat,
+            parent: Default::default(),
+        }
+    }
+}
+
+/// The marker component for entities of type `minecraft:poplar_chest_boat`.
+///
+/// # Metadata
+///
+/// This entity type does not add any additional metadata. It will still have
+/// metadata from parent types.
+///
+/// # Parents
+///
+/// Entities with `PoplarChestBoat` will also have the following marker
+/// components and their metadata fields:
+///
+/// - [AbstractBoat]
+/// - [AbstractVehicle]
+/// - [AbstractEntity]
+///
+/// # Children
+///
+/// This entity type has no children types.
+#[derive(Component)]
+pub struct PoplarChestBoat;
+impl PoplarChestBoat {
+    fn apply_metadata(
+        entity: &mut bevy_ecs::system::EntityCommands,
+        d: EntityDataItem,
+    ) -> Result<(), UpdateMetadataError> {
+        match d.index {
+            0..=13 => AbstractBoat::apply_metadata(entity, d)?,
+            _ => {}
+        }
+        Ok(())
+    }
+}
+
+/// The metadata bundle for [PoplarChestBoat].
+///
+/// This type should generally not be used directly.
+#[derive(Bundle)]
+pub struct PoplarChestBoatMetadataBundle {
+    _marker: PoplarChestBoat,
+    parent: AbstractBoatMetadataBundle,
+}
+impl Default for PoplarChestBoatMetadataBundle {
+    fn default() -> Self {
+        Self {
+            _marker: PoplarChestBoat,
+            parent: Default::default(),
+        }
+    }
+}
+
 /// The marker component for entities of type `minecraft:spruce_boat`.
 ///
 /// # Metadata
@@ -13041,6 +13260,11 @@ pub fn apply_metadata(
                 Creeper::apply_metadata(entity, d)?;
             }
         }
+        EntityKind::Cushion => {
+            for d in items {
+                Cushion::apply_metadata(entity, d)?;
+            }
+        }
         EntityKind::DarkOakBoat => {
             for d in items {
                 DarkOakBoat::apply_metadata(entity, d)?;
@@ -13416,6 +13640,16 @@ pub fn apply_metadata(
                 PolarBear::apply_metadata(entity, d)?;
             }
         }
+        EntityKind::PoplarBoat => {
+            for d in items {
+                PoplarBoat::apply_metadata(entity, d)?;
+            }
+        }
+        EntityKind::PoplarChestBoat => {
+            for d in items {
+                PoplarChestBoat::apply_metadata(entity, d)?;
+            }
+        }
         EntityKind::Pufferfish => {
             for d in items {
                 Pufferfish::apply_metadata(entity, d)?;
@@ -13771,6 +14005,9 @@ pub fn apply_default_metadata(entity: &mut bevy_ecs::system::EntityCommands, kin
         EntityKind::Creeper => {
             entity.insert(CreeperMetadataBundle::default());
         }
+        EntityKind::Cushion => {
+            entity.insert(CushionMetadataBundle::default());
+        }
         EntityKind::DarkOakBoat => {
             entity.insert(DarkOakBoatMetadataBundle::default());
         }
@@ -13995,6 +14232,12 @@ pub fn apply_default_metadata(entity: &mut bevy_ecs::system::EntityCommands, kin
         }
         EntityKind::PolarBear => {
             entity.insert(PolarBearMetadataBundle::default());
+        }
+        EntityKind::PoplarBoat => {
+            entity.insert(PoplarBoatMetadataBundle::default());
+        }
+        EntityKind::PoplarChestBoat => {
+            entity.insert(PoplarChestBoatMetadataBundle::default());
         }
         EntityKind::Pufferfish => {
             entity.insert(PufferfishMetadataBundle::default());

@@ -3,7 +3,6 @@ mod events;
 use std::{collections::HashSet, sync::Arc};
 
 use azalea_core::{
-    delta::PositionDelta8,
     entity_id::MinecraftEntityId,
     game_type::GameMode,
     position::{ChunkPos, Vec3},
@@ -16,11 +15,11 @@ use azalea_entity::{
     inventory::Inventory,
     metadata::{Health, apply_metadata},
 };
-use azalea_protocol::{
-    common::movements::MoveFlags,
-    packets::{
-        ConnectionProtocol,
-        game::{c_move_entity_pos_rot::CompactLookDirection, *},
+use azalea_protocol::packets::{
+    ConnectionProtocol,
+    game::{
+        c_move_entity_pos_rot::{CompactLookDirection, VecDelta},
+        *,
     },
 };
 use azalea_registry::builtin::EntityKind;
@@ -52,7 +51,8 @@ use crate::{
 pub fn process_packet(ecs: &mut World, player: Entity, packet: &ClientboundGamePacket) {
     let mut handler = GamePacketHandler { player, ecs };
 
-    // the order of these doesn't matter, that's decided by the protocol library
+    // the order of these doesn't matter, packet ids are chosen by the protocol
+    // library
     declare_packet_handlers!(
         ClientboundGamePacket,
         packet,
@@ -199,6 +199,9 @@ pub fn process_packet(ecs: &mut World, player: Entity, packet: &ClientboundGameP
             game_test_highlight_pos,
             low_disk_space_warning,
             game_rule_values,
+            post_effects,
+            swing_animation,
+            add_transient_block,
         ]
     );
 }
@@ -435,16 +438,14 @@ impl GamePacketHandler<'_> {
             // send the relevant packets
             commands.trigger(SendGamePacketEvent::new(
                 self.player,
-                ServerboundAcceptTeleportation { id: p.id },
-            ));
-            commands.trigger(SendGamePacketEvent::new(
-                self.player,
-                ServerboundMovePlayerPosRot {
-                    pos: **position,
-                    look_direction: *direction,
-                    flags: MoveFlags::default(),
+                ServerboundAcceptTeleportation {
+                    id: p.id,
+                    position: **position,
+                    direction: *direction,
                 },
             ));
+
+            // TODO: stopDestroyBlock is called here
         });
     }
 
@@ -859,9 +860,9 @@ impl GamePacketHandler<'_> {
                     commands,
                     MoveEntity {
                         entity_id: p.entity_id,
-                        delta: Some(p.delta),
+                        delta: Some(p.delta.clone()),
                         look_direction: None,
-                        on_ground: p.on_ground,
+                        on_ground: p.properties.on_ground(),
                     },
                     player_query,
                     entity_query,
@@ -884,9 +885,9 @@ impl GamePacketHandler<'_> {
                     commands,
                     MoveEntity {
                         entity_id: p.entity_id,
-                        delta: Some(p.delta),
+                        delta: Some(p.delta.clone()),
                         look_direction: Some(p.look_direction),
-                        on_ground: p.on_ground,
+                        on_ground: p.properties.on_ground(),
                     },
                     player_query,
                     entity_query,
@@ -1503,9 +1504,9 @@ impl GamePacketHandler<'_> {
                     return;
                 };
 
-                let new_position = p.values.pos;
+                let new_position = p.position.end_position();
                 let new_on_ground = p.on_ground;
-                let new_look_direction = p.values.look_direction;
+                let new_look_direction = p.look_direction;
 
                 if !should_apply_entity_update(
                     &mut commands,
@@ -1649,11 +1650,21 @@ impl GamePacketHandler<'_> {
     pub fn game_rule_values(&mut self, p: &ClientboundGameRuleValues) {
         debug!("Got game rule values packet {p:?}");
     }
+
+    pub fn post_effects(&mut self, p: &ClientboundPostEffects) {
+        debug!("Got post effects packet {p:?}");
+    }
+    pub fn swing_animation(&mut self, p: &ClientboundSwingAnimation) {
+        debug!("Got swing animation packet {p:?}");
+    }
+    pub fn add_transient_block(&mut self, p: &ClientboundAddTransientBlock) {
+        debug!("Got add transient block packet {p:?}");
+    }
 }
 
 struct MoveEntity {
     pub entity_id: MinecraftEntityId,
-    pub delta: Option<PositionDelta8>,
+    pub delta: Option<VecDelta>,
     pub look_direction: Option<CompactLookDirection>,
     pub on_ground: bool,
 }
@@ -1695,7 +1706,7 @@ fn move_entity(
     }
 
     if let Some(new_delta) = p.delta {
-        let new_position = physics.vec_delta_codec.decode(&new_delta);
+        let new_position = new_delta.decode(&physics.vec_delta_codec).end_position();
         physics.vec_delta_codec.set_base(new_position);
 
         if new_position != **position {
