@@ -133,11 +133,42 @@ impl From<OptionalGameType> for Option<GameMode> {
 
 impl AzBuf for OptionalGameType {
     fn azalea_read(buf: &mut Cursor<&[u8]>) -> Result<Self, BufReadError> {
-        let id = i8::azalea_read(buf)?;
-        GameMode::from_optional_id(id)
+        let raw = u32::azalea_read_var(buf)?;
+        let Some(id) = raw.checked_sub(1) else {
+            return Ok(OptionalGameType(None));
+        };
+        u8::try_from(id)
+            .ok()
+            .and_then(GameMode::from_id)
+            .map(|game_mode| OptionalGameType(Some(game_mode)))
             .ok_or(BufReadErrorRepr::UnexpectedEnumVariant { id: id as i32 }.into())
     }
     fn azalea_write(&self, buf: &mut impl Write) -> io::Result<()> {
-        GameMode::to_optional_id(*self).azalea_write(buf)
+        let raw = match self.0 {
+            Some(game_mode) => game_mode.to_id() as u32 + 1,
+            None => 0,
+        };
+        raw.azalea_write_var(buf)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn optional_game_type_is_optional_varint() {
+        for (value, bytes) in [
+            (OptionalGameType(None), vec![0u8]),
+            (OptionalGameType(Some(GameMode::Survival)), vec![1]),
+            (OptionalGameType(Some(GameMode::Spectator)), vec![4]),
+        ] {
+            let mut buf = Vec::new();
+            value.azalea_write(&mut buf).unwrap();
+            assert_eq!(buf, bytes);
+            let read = OptionalGameType::azalea_read(&mut Cursor::new(&buf[..])).unwrap();
+            assert_eq!(read, value);
+        }
+        assert!(OptionalGameType::azalea_read(&mut Cursor::new(&[5u8][..])).is_err());
     }
 }

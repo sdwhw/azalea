@@ -36,8 +36,6 @@ pub struct DisplayInfo {
     pub show_toast: bool,
     pub hidden: bool,
     pub background: Option<Identifier>,
-    pub x: f32,
-    pub y: f32,
 }
 
 impl AzBuf for DisplayInfo {
@@ -57,8 +55,6 @@ impl AzBuf for DisplayInfo {
         } else {
             None
         };
-        let x = AzBuf::azalea_read(buf)?;
-        let y = AzBuf::azalea_read(buf)?;
         Ok(DisplayInfo {
             title,
             description,
@@ -67,8 +63,6 @@ impl AzBuf for DisplayInfo {
             show_toast,
             hidden,
             background,
-            x,
-            y,
         })
     }
     fn azalea_write(&self, buf: &mut impl Write) -> io::Result<()> {
@@ -92,8 +86,6 @@ impl AzBuf for DisplayInfo {
         if let Some(background) = &self.background {
             background.azalea_write(buf)?;
         }
-        self.x.azalea_write(buf)?;
-        self.y.azalea_write(buf)?;
         Ok(())
     }
 }
@@ -133,7 +125,7 @@ mod tests {
     #[test]
     fn test() {
         let packet = ClientboundUpdateAdvancements {
-            reset: true,
+            should_reset: true,
             added: [PositionedAdvancement {
                 advancement: AdvancementHolder {
                     id: Identifier::new("minecraft:test"),
@@ -147,8 +139,6 @@ mod tests {
                             show_toast: true,
                             hidden: false,
                             background: None,
-                            x: 0.0,
-                            y: 0.0,
                         })),
                         requirements: Vec::new(),
                         sends_telemetry_event: false,
@@ -181,15 +171,15 @@ mod tests {
         let mut buf: Cursor<&[u8]> = Cursor::new(&data);
 
         let read_packet = ClientboundUpdateAdvancements::azalea_read(&mut buf).unwrap();
-        assert_eq!(packet.reset, read_packet.reset);
+        assert_eq!(packet.should_reset, read_packet.should_reset);
         assert_eq!(packet.removed, read_packet.removed);
 
         let advancement = packet
             .added
             .into_iter()
             .find_map(|a| {
-                if a.id == Identifier::new("minecraft:test") {
-                    Some(a.value)
+                if a.advancement.id == Identifier::new("minecraft:test") {
+                    Some(a.advancement.value)
                 } else {
                     None
                 }
@@ -200,8 +190,8 @@ mod tests {
             .added
             .into_iter()
             .find_map(|a| {
-                if a.id == Identifier::new("minecraft:test") {
-                    Some(a.value)
+                if a.advancement.id == Identifier::new("minecraft:test") {
+                    Some(a.advancement.value)
                 } else {
                     None
                 }
