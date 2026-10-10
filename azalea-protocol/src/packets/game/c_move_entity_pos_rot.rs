@@ -52,7 +52,11 @@ pub fn write_move_entity_packet(
     include_look_direction: bool,
 ) -> io::Result<()> {
     p.entity_id.azalea_write_var(buf)?;
-    p.properties.azalea_write(buf)?;
+    // like vanilla, always derive the step count from the delta so `properties`
+    // can never disagree with the number of steps that actually get written
+    p.properties
+        .with_step_count(p.delta.step_count())
+        .azalea_write(buf)?;
     p.delta.write_and_get_steps(buf)?;
 
     if include_look_direction {
@@ -74,6 +78,14 @@ pub struct DeltaStep {
     pub pos: PositionDelta8,
 }
 impl VecDelta {
+    /// The number of steps, or 0 if this is [`VecDelta::Linear`].
+    pub fn step_count(&self) -> u32 {
+        match self {
+            VecDelta::Linear(_) => 0,
+            VecDelta::Stepped(steps) => steps.len() as u32,
+        }
+    }
+
     pub fn read_with_steps(
         buf: &mut Cursor<&[u8]>,
         step_count: i32,
