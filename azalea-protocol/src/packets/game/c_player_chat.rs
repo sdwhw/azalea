@@ -8,7 +8,7 @@ use azalea_chat::{
     FormattedText,
     component::translatable::{PrimitiveOrComponent, TranslatableComponent},
 };
-use azalea_core::{bitset::JavaBitSet, identifier::Identifier};
+use azalea_core::identifier::Identifier;
 use azalea_crypto::signing::MessageSignature;
 use azalea_protocol_macros::ClientboundGamePacket;
 use azalea_registry::{
@@ -19,6 +19,8 @@ use azalea_registry::{
 };
 use simdnbt::owned::NbtCompound;
 use uuid::Uuid;
+
+use crate::common::bitset::BitSet;
 
 #[derive(AzBuf, ClientboundGamePacket, Clone, Debug, PartialEq)]
 pub struct ClientboundPlayerChat {
@@ -60,7 +62,7 @@ pub enum PackedMessageSignature {
 pub enum FilterMask {
     PassThrough,
     FullyFiltered,
-    PartiallyFiltered(JavaBitSet),
+    PartiallyFiltered(BitSet),
 }
 
 #[derive(AzBuf, Clone, Debug, PartialEq)]

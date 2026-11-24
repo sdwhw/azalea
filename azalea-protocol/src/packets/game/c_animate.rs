@@ -13,10 +13,7 @@ pub struct ClientboundAnimate {
 // so i don't have to add a special handler
 #[derive(AzBuf, Clone, Copy, Debug, PartialEq)]
 pub enum AnimationAction {
-    SwingMainHand = 0,
-    Hurt = 1,
-    WakeUp = 2,
-    SwingOffHand = 3,
-    CriticalHit = 4,
-    MagicCriticalHit = 5,
+    WakeUp = 0,
+    CriticalHit = 1,
+    MagicCriticalHit = 2,
 }

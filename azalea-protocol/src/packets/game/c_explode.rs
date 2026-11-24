@@ -1,7 +1,7 @@
 use azalea_buf::AzBuf;
-use azalea_core::position::Vec3;
+use azalea_core::{position::Vec3, sound::CustomSound};
 use azalea_protocol_macros::ClientboundGamePacket;
-use azalea_registry::{builtin::SoundEvent, registry_holder::particle::Particle};
+use azalea_registry::{Holder, builtin::SoundEvent, registry_holder::particle::Particle};
 
 #[derive(AzBuf, ClientboundGamePacket, Clone, Debug, PartialEq)]
 pub struct ClientboundExplode {
@@ -10,8 +10,9 @@ pub struct ClientboundExplode {
     pub block_count: i32,
     pub player_knockback: Option<Vec3>,
     pub explosion_particle: Particle,
-    pub explosion_sound: SoundEvent,
+    pub explosion_sound: Holder<SoundEvent, CustomSound>,
     pub block_particles: Vec<Weighted<ExplosionParticleInfo>>,
+    pub play_sound: bool,
 }
 
 #[derive(AzBuf, Clone, Debug, PartialEq)]
